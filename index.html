@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-4xl mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center mb-6 text-purple-700">Smart Ordering System</h1>
+
+    <div class="flex space-x-4 mb-4">
+      <button onclick="switchTab('add')" class="tab-btn bg-purple-600 text-white px-4 py-2 rounded">Add Order</button>
+      <button onclick="switchTab('view')" class="tab-btn bg-gray-300 px-4 py-2 rounded">View Orders</button>
+    </div>
+
+    <div id="add-tab">
+      <div class="mb-4 grid grid-cols-2 gap-4">
+        <input id="shopName" oninput="suggestShops()" placeholder="Shop Name" class="border p-2 rounded w-full" list="shopSuggestions"/>
+        <input id="productName" oninput="suggestProducts()" placeholder="Product Name" class="border p-2 rounded w-full" list="productSuggestions"/>
+        <input id="quantity" type="number" placeholder="Quantity" class="border p-2 rounded w-full"/>
+        <button onclick="addItem()" class="bg-green-600 text-white px-4 py-2 rounded">Add Item</button>
+      </div>
+      <datalist id="shopSuggestions"></datalist>
+      <datalist id="productSuggestions"></datalist>
+
+      <table class="w-full border mt-4 bg-white shadow rounded">
+        <thead class="bg-purple-100">
+          <tr>
+            <th class="p-2 text-left">Product</th>
+            <th class="p-2 text-left">Quantity</th>
+            <th class="p-2 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody id="orderTable"></tbody>
+      </table>
+
+      <div class="mt-4 flex space-x-4">
+        <button onclick="saveOrder()" class="bg-blue-600 text-white px-6 py-2 rounded">Save</button>
+        <button onclick="clearForm()" class="bg-gray-400 text-white px-6 py-2 rounded">Clear</button>
+      </div>
+    </div>
+
+    <div id="view-tab" class="hidden">
+      <div class="flex space-x-4 mb-4">
+        <input id="filterShop" oninput="suggestShops('filterShop')" list="shopSuggestions" placeholder="Filter by Shop" class="border p-2 rounded w-full"/>
+        <input type="date" id="startDate" class="border p-2 rounded"/>
+        <input type="date" id="endDate" class="border p-2 rounded"/>
+        <button onclick="filterOrders()" class="bg-purple-600 text-white px-4 py-2 rounded">Filter</button>
+      </div>
+      <div id="ordersList" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <script>
+    const shops = [
+      "Bidii investments", "Mattumat", "Wamo agencies", "Greenvast order", "Target",
+      "Mzuri", "Hallmark 136kg", "Northern Mart", "Harir", "Arabey", "Kensomart", "Garissa ndog"
+    ];
+
+    const products = [
+      "Bread 500gm", "Bread 600gm", "Bread 900gm", "Bread 1 kg", "Bread 1000gm",
+      "Bread 400gm", "Bread 300gm", "Bread 200gm"
+    ];
+
+    let orderItems = [];
+
+    function switchTab(tab) {
+      document.getElementById('add-tab').classList.toggle('hidden', tab !== 'add');
+      document.getElementById('view-tab').classList.toggle('hidden', tab !== 'view');
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('bg-purple-600', btn.textContent.includes(tab === 'add' ? 'Add' : 'View'));
+        btn.classList.toggle('text-white', btn.textContent.includes(tab === 'add' ? 'Add' : 'View'));
+        btn.classList.toggle('bg-gray-300', !btn.textContent.includes(tab === 'add' ? 'Add' : 'View'));
+      });
+    }
+
+    function suggestShops(inputId = "shopName") {
+      const val = document.getElementById(inputId).value.toLowerCase();
+      const suggestions = shops.filter(s => s.toLowerCase().includes(val));
+      const datalist = document.getElementById("shopSuggestions");
+      datalist.innerHTML = suggestions.map(s => `<option value="${s}"/>`).join('');
+    }
+
+    function suggestProducts() {
+      const val = document.getElementById("productName").value.toLowerCase();
+      const suggestions = products.filter(p => p.toLowerCase().includes(val));
+      const datalist = document.getElementById("productSuggestions");
+      datalist.innerHTML = suggestions.map(p => `<option value="${p}"/>`).join('');
+    }
+
+    function addItem() {
+      const product = document.getElementById("productName").value;
+      const quantity = parseFloat(document.getElementById("quantity").value);
+      if (!product || !quantity) return alert("Product and Quantity required.");
+
+      orderItems.push({ product, quantity });
+      document.getElementById("productName").value = '';
+      document.getElementById("quantity").value = '';
+      renderOrderTable();
+    }
+
+    function renderOrderTable() {
+      const table = document.getElementById("orderTable");
+      table.innerHTML = orderItems.map((item, i) => `
+        <tr>
+          <td class="p-2">${item.product}</td>
+          <td class="p-2">
+            <input type="number" value="${item.quantity}" class="border p-1 rounded w-20"
+              onchange="updateQty(${i}, this.value)" />
+          </td>
+          <td class="p-2">
+            <button onclick="deleteItem(${i})" class="text-red-600">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateQty(index, val) {
+      orderItems[index].quantity = parseFloat(val);
+    }
+
+    function deleteItem(index) {
+      orderItems.splice(index, 1);
+      renderOrderTable();
+    }
+
+    function clearForm() {
+      document.getElementById("shopName").value = '';
+      document.getElementById("productName").value = '';
+      document.getElementById("quantity").value = '';
+      orderItems = [];
+      renderOrderTable();
+    }
+
+    function saveOrder() {
+      const shop = document.getElementById("shopName").value;
+      if (!shop || orderItems.length === 0) return alert("Shop name and items are required.");
+      const date = new Date().toLocaleDateString();
+
+      const order = { shop, date, items: [...orderItems] };
+      const saved = JSON.parse(localStorage.getItem("orders") || "[]");
+      saved.push(order);
+      localStorage.setItem("orders", JSON.stringify(saved));
+      generatePDF(order);
+      clearForm();
+      alert("Order saved successfully.");
+    }
+
+    async function generatePDF(order) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Shop: ${order.shop}`, 10, 20);
+      doc.text(`Date: ${order.date}`, 10, 30);
+      doc.setFontSize(12);
+      let y = 40;
+      doc.text("Product", 10, y);
+      doc.text("Qty", 100, y);
+      y += 10;
+      order.items.forEach(item => {
+        doc.text(item.product, 10, y);
+        doc.text(item.quantity.toString(), 100, y);
+        y += 10;
+      });
+      doc.save(`${order.shop.replace(/\s+/g, '_')}_Order.pdf`);
+    }
+
+    function filterOrders() {
+      const allOrders = JSON.parse(localStorage.getItem("orders") || "[]");
+      const shopFilter = document.getElementById("filterShop").value.toLowerCase();
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+      const list = document.getElementById("ordersList");
+
+      const filtered = allOrders.filter(o => {
+        const date = new Date(o.date);
+        const startDate = start ? new Date(start) : null;
+        const endDate = end ? new Date(end) : null;
+        return (!shopFilter || o.shop.toLowerCase().includes(shopFilter)) &&
+               (!startDate || date >= startDate) &&
+               (!endDate || date <= endDate);
+      });
+
+      list.innerHTML = filtered.map(o => `
+        <div class="bg-white p-4 shadow rounded">
+          <h3 class="font-bold text-lg text-purple-600">${o.shop}</h3>
+          <p class="text-sm text-gray-500">${o.date}</p>
+          <table class="w-full mt-2 border-t pt-2">
+            <thead>
+              <tr><th class="text-left">Product</th><th class="text-left">Qty</th></tr>
+            </thead>
+            <tbody>
+              ${o.items.map(i => `
+                <tr>
+                  <td>${i.product}</td>
+                  <td>${i.quantity}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <button onclick='generatePDF(${JSON.stringify(o)})' class="mt-2 bg-blue-500 text-white px-3 py-1 rounded">Print PDF</button>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
